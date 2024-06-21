@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seleccionar Doctor</title>
+    <!-- Firebase App (the core Firebase SDK) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <!-- Add Firebase products that you want to use -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            width: 300px;
+            text-align: center;
+        }
+        h2 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            text-align: left;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        select {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            box-sizing: border-box;
+        }
+        button[type="submit"] {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button[type="submit"]:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Selecciona el tipo de consulta y el doctor</h2>
+        <form id="selectionForm">
+            <label for="consulta">Tipo de consulta:</label><br>
+            <select id="consulta" name="consulta" required>
+                <option value="urgente">Urgente</option>
+                <option value="emergencia">Emergencia</option>
+            </select><br><br>
+
+            <label for="doctor">Selecciona el doctor:</label><br>
+            <select id="doctor" name="doctor" required>
+                <!-- Doctores se cargarán aquí -->
+            </select><br><br>
+
+            <button type="submit">Iniciar Chat</button>
+        </form>
+    </div>
+
+    <script>
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyC4uH1rxmJZyvDn-e8xnLyZ3KFOGgjSPPQ",
+            authDomain: "conexnurse.firebaseapp.com",
+            projectId: "conexnurse",
+            storageBucket: "conexnurse.appspot.com",
+            messagingSenderId: "168276042658",
+            appId: "1:168276042658:web:99c2d9e5d2934aba8348fb",
+            measurementId: "G-FNBJTTY1MD"
+        };
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        var db = firebase.firestore();
+        var auth = firebase.auth();
+
+        auth.onAuthStateChanged(function(user) {
+            if (user) {
+                loadDoctors();
+            } else {
+                window.location.href = "Chatbot.html";
+            }
+        });
+
+        function loadDoctors() {
+            var doctorSelect = document.getElementById('doctor');
+            db.collection("doctors").get().then((querySnapshot) => {
+                querySnapshot.forEach((doc) => {
+                    var doctor = doc.data();
+                    var option = document.createElement('option');
+                    option.value = doc.id; // Assuming doc.id is unique identifier for the doctor
+                    option.textContent = doctor.nombre + " " + doctor.apellido;
+                    doctorSelect.appendChild(option);
+                });
+            }).catch((error) => {
+                console.error("Error loading doctors: ", error);
+            });
+        }
+
+        function formatTimestamp(date) {
+            return date.getFullYear() + "-" +
+                String(date.getMonth() + 1).padStart(2, '0') + "-" +
+                String(date.getDate()).padStart(2, '0') + " " +
+                String(date.getHours()).padStart(2, '0') + ":" +
+                String(date.getMinutes()).padStart(2, '0') + ":" +
+                String(date.getSeconds()).padStart(2, '0') + "." +
+                String(date.getMilliseconds()).padStart(3, '0') + "Z";
+        }
+
+        document.getElementById('selectionForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+
+            var consulta = document.getElementById('consulta').value;
+            var doctorId = document.getElementById('doctor').value;
+
+            var chatId = db.collection("chats").doc().id; // Generate unique ID for chat
+            sessionStorage.setItem('chatId', chatId);
+            sessionStorage.setItem('doctor', doctorId);
+
+            var user = auth.currentUser;
+
+            db.collection("doctors").doc(doctorId).get().then((doc) => {
+                var doctorData = doc.data();
+
+                var chatData = {
+                    consulta: consulta,
+                    doctor: {
+                        id: doctorId,
+                        nombre: doctorData.nombre + " " + doctorData.apellido
+                    },
+                    cliente: {
+                        id: user.uid
+                    },
+                    messages: []
+                };
+
+                db.collection("chats").doc(chatId).set(chatData).then(() => {
+                    var formattedTimestamp = formatTimestamp(new Date());
+                    var initialMessage = {
+                        text: "Hola",
+                        sender: user.uid,
+                        senderName: user.displayName || "Cliente",
+                        timestamp: formattedTimestamp  // Guardar el timestamp en formato deseado
+                    };
+
+                    db.collection("chats").doc(chatId).update({
+                        messages: firebase.firestore.FieldValue.arrayUnion(initialMessage)
+                    }).then(() => {
+                        window.location.href = "Chatbot.html";
+                    }).catch((error) => {
+                        console.error("Error updating chat with initial message:", error);
+                    });
+                }).catch((error) => {
+                    console.error("Error creating chat:", error);
+                });
+            }).catch((error) => {
+                console.error("Error getting doctor data:", error);
+            });
+        });
+    </script>
+</body>
+</html>

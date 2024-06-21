@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Google Generative AI Chatbot</title>
+
+    <link rel="icon" href="img/ConexNurse/logo_nurse.png" type="image/x-icon" />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-GLhlTQ8iRABdZLl6O3oVMWSktQOp6b7In1Zl3/Jr59b6EGGoI1aFkw7cmDA6j6gD"
+      crossorigin="anonymous"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css"
+    />
+    <link rel="stylesheet" href="css/style.css" />
+    <style>
+      /* Estilos CSS aquí */
+      .chatbot {
+        display: block;
+      }
+    </style>
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+      <a href="#" class="navbar-brand">
+        <img
+          class="main-logo dark animated fadeIn"
+          srcset="img/ConexNurse/logo_nurse.png 7x"
+        />
+      </a>
+      <button
+        class="navbar-toggler"
+        type="button"
+        data-bs-toggle="collapse"
+        data-bs-target="navbarS"
+        aria-controls="navbarS"
+        aria-expanded="false"
+        aria-label="Toggle navigation"
+      >
+        <span class="navbar-toggle-icon"></span>
+      </button>
+
+      <div
+        class="navbar navbar-expand-lg bg-body-tertiary"
+        id="navbarS"
+        style="font-size: 20px; padding-left: 20px"
+      >
+        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+          <li class="nav-item" s>
+            <a href="index.html" class="nav-link">Inicio</a>
+          </li>
+          <li class="nav-item">
+            <a href="#us" class="nav-link">Nosotros</a>
+          </li>
+       <p id="txtnombre"></p>
+        </ul>
+     
+        
+      </div>
+    </nav>
+  </head>
+  <body>
+    <script></script>
+    <div class="container">
+      <div class="chatbot">
+        <header>
+          <h2 id="">Conex Bot</h2>
+        </header>
+        <ul class="chatbox">
+          <li class="chat incoming">
+            <img
+              class="main-logo dark animated fadeIn"
+              srcset="img/ConexNurse/logo_nurse.png 7x"
+            />
+
+            <p>Hola, como te sientes?</p>
+          </li>
+        </ul>
+        <div class="chat-input">
+          <textarea
+            id="userInput"
+            placeholder="Envia un mensaje"
+            spellcheck="false"
+          ></textarea>
+        </div>
+      </div>
+    </div>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "@google/generative-ai": "https://esm.run/@google/generative-ai"
+        }
+      }
+    </script>
+
+    <script>
+      // Obtener los parámetros de la URL
+      const urlParams = new URLSearchParams(window.location.search);
+
+      // Obtener el valor del parámetro "nombre"
+      const nombre = urlParams.get("nombre");
+
+      // Obtener el valor del parámetro "fecha_nacimiento"
+      const fechaNacimiento = urlParams.get("fecha_nacimiento");
+
+      // Mostrar los datos en la página
+      const userInfo = document.getElementById("userInfo");
+      userInfo.innerHTML = `
+            <p>Nombre: ${nombre}</p>
+            <p>Fecha de nacimiento: ${fechaNacimiento}</p>
+        `;
+    </script>
+    <script type="module">
+          document.getElementById("txtnombre").value=nombre
+      import { GoogleGenerativeAI } from "@google/generative-ai";
+
+      const API_KEY = "AIzaSyAeKuAT6nu0ZxKAGl_w_ZY9ZK4RLtojjPg"; // Reemplaza con tu clave API real
+
+      const genAI = new GoogleGenerativeAI(API_KEY);
+      let chat;
+
+      async function initializeChat() {
+        try {
+          const model = await genAI.getGenerativeModel({
+            model: "gemini-1.5-flash-latest",
+          });
+          chat = await model.startChat({
+            history: [
+              {
+                role: "user",
+                parts: [
+                  {
+                    text:
+                      "Hola, mi nombre es " +
+                      nombre +
+                      ". Nací el " +
+                      fechaNacimiento +
+                      "me siento un poco enfermo",
+                  },
+                ],
+              },
+              {
+                role: "model",
+                parts: [
+                  { text: "¡Encantado de conocerte! ¿Que sintomas tienes?" },
+                ],
+              },
+            ],
+            generationConfig: {
+              maxOutputTokens: 100,
+            },
+          });
+        } catch (error) {
+          console.error("Error al inicializar el chat:", error);
+        }
+      }
+
+      async function sendMessage() {
+        const userInput = document.getElementById("userInput").value;
+        if (!userInput.trim()) return;
+
+        const chatbox = document.querySelector(".chatbox");
+
+        // Display user's message
+        const userMessage = document.createElement("li");
+        userMessage.classList.add("chat", "outgoing");
+        userMessage.innerHTML = `<p>${userInput}</p>`;
+        chatbox.appendChild(userMessage);
+
+        // Scroll to the bottom
+        chatbox.scrollTop = chatbox.scrollHeight;
+
+        try {
+          const result = await chat.sendMessage(userInput);
+          const response = await result.response;
+          const text = await response.text();
+
+          // Display model's message
+          const modelMessage = document.createElement("li");
+          modelMessage.classList.add("chat", "incoming");
+          modelMessage.innerHTML = `   <img srcset="img/ConexNurse/logo_nurse.png 7x "><p>${text}</p>`;
+          chatbox.appendChild(modelMessage);
+
+          // Scroll to the bottom
+          chatbox.scrollTop = chatbox.scrollHeight;
+        } catch (error) {
+          console.error("Error durante el chat AI:", error);
+        }
+
+        // Clear the input field
+       
+      }
+    
+      document
+        .getElementById("userInput")
+        .addEventListener("keypress", function (event) {
+          if (event.key === "Enter") {
+            event.preventDefault(); // Evitar que el Enter agregue una nueva línea
+            sendMessage();
+            document.getElementById("userInput").value = "";
+          }
+        });
+
+      // Inicializar el chat cuando la página se carga
+      initializeChat();
+    </script>
+  </body>
+</html>

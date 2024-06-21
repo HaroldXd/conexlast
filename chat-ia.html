@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Generative AI Chatbot</title>
+    <!-- Estilos y recursos CSS -->
+    <link rel="stylesheet" href="css/style.css">
+    <!-- Firebase JavaScript SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-messaging.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="chatbot" id="chatbot">
+            <header>
+                <h2>Conex Bot</h2>
+                <button id="emergencyButton" class="btn btn-danger">Emergencia</button>
+            </header>
+            <ul class="chatbox" id="chatbox">
+                <li class="chat incoming">
+                    <img src="img/ConexNurse/logo_nurse.png" alt="Logo" />
+                    <p>Hola, ¿cómo te sientes?</p>
+                </li>
+            </ul>
+            <div class="chat-input">
+                <textarea id="userInput" placeholder="Envia un mensaje" spellcheck="false"></textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script principal de la aplicación -->
+    <script>
+        // Configuración de Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyC4uH1rxmJZyvDn-e8xnLyZ3KFOGgjSPPQ",
+            authDomain: "conexnurse.firebaseapp.com",
+            projectId: "conexnurse",
+            storageBucket: "conexnurse.appspot.com",
+            messagingSenderId: "168276042658",
+            appId: "1:168276042658:web:99c2d9e5d2934aba8348fb",
+            measurementId: "G-FNBJTTY1MD"
+        };
+    
+        // Inicialización de Firebase
+        firebase.initializeApp(firebaseConfig);
+        const messaging = firebase.messaging();
+    
+        // Solicitar permisos de notificación (opcional)
+        async function requestPermission() {
+            try {
+                await messaging.requestPermission();
+                const token = await messaging.getToken();
+                console.log('Token FCM:', token);
+                return token;
+            } catch (error) {
+                console.error('Error al solicitar permisos:', error);
+                throw error;
+            }
+        }
+    
+        // Evento al presionar el botón de emergencia
+        document.getElementById("emergencyButton").addEventListener("click", async () => {
+            try {
+                // Enviar notificación a través de AWS API Gateway y Lambda
+                const response = await fetch('https://3j2mtbwx80.execute-api.us-east-2.amazonaws.com/dev/emergency', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: 'Se ha presionado el botón de emergencia.'
+                    })
+                });
+    
+                const responseData = await response.json();
+                console.log('Respuesta de Lambda:', responseData);
+    
+                alert("Se ha enviado una notificación de emergencia a través de Twilio.");
+            } catch (error) {
+                console.error("Error enviando notificación de emergencia:", error);
+                alert("Error enviando notificación de emergencia.");
+            }
+        });
+    
+        // Llamada para solicitar permisos de notificación (opcional)
+        requestPermission();
+    </script>
+    
+    
+</body>
+</html>

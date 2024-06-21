@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Google Generative AI Chatbot</title>
+    <link rel="icon" href="img/ConexNurse/logo_nurse.png" type="image/x-icon" />
+    <link
+        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css"
+        rel="stylesheet"
+        integrity="sha384-GLhlTQ8iRABdZLl6O3oVMWSktQOp6b7In1Zl3/Jr59b6EGGoI1aFkw7cmDA6j6gD"
+        crossorigin="anonymous"
+    />
+    <link
+        rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css"
+    />
+    <link rel="stylesheet" href="css/style.css" />
+    <style>
+        .chatbot {
+            display: block;
+        }
+        .chat {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+        }
+        .chat p {
+            margin: 0 10px;
+        }
+        .chat.incoming {
+            flex-direction: row-reverse;
+        }
+    </style>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="chatbot" id="chatbot">
+            <header>
+                <h2>Conex Bot</h2>
+                <button id="emergencyButton" class="btn btn-danger">Emergencia</button>
+            </header>
+            <ul class="chatbox" id="chatbox">
+                <li class="chat incoming">
+                    <p>Hola, ¿cómo te sientes?</p>
+                </li>
+            </ul>
+            <div class="chat-input">
+                <textarea id="userInput" placeholder="Envia un mensaje" spellcheck="false"></textarea>
+            </div>
+        </div>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "@google/generative-ai": "https://esm.run/@google/generative-ai"
+            }
+        }
+    </script>
+    <script type="module">
+        import { GoogleGenerativeAI } from "@google/generative-ai";
+
+        const API_KEY = "AIzaSyAeKuAT6nu0ZxKAGl_w_ZY9ZK4RLtojjPg";
+        const genAI = new GoogleGenerativeAI(API_KEY);
+        let chat;
+
+        async function initializeChat() {
+            try {
+                const model = await genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+                chat = await model.startChat({
+                    history: [
+                        {
+                            role: "user",
+                            parts: [{ text: "Hola, me siento un poco enfermo." }]
+                        },
+                        {
+                            role: "model",
+                            parts: [{ text: "¡Encantado de conocerte! ¿Qué síntomas tienes?" }]
+                        }
+                    ],
+                    generationConfig: { maxOutputTokens: 100 }
+                });
+            } catch (error) {
+                console.error("Error al inicializar el chat:", error);
+            }
+        }
+
+        async function sendMessage() {
+            const userInput = document.getElementById("userInput").value;
+            if (!userInput.trim()) return;
+
+            const chatbox = document.getElementById("chatbox");
+
+            const userMessage = document.createElement("li");
+            userMessage.classList.add("chat", "outgoing");
+            userMessage.innerHTML = `<p>${userInput}</p>`;
+            chatbox.appendChild(userMessage);
+            chatbox.scrollTop = chatbox.scrollHeight;
+
+            try {
+                const result = await chat.sendMessage(userInput);
+                const response = await result.response;
+                const text = await response.text();
+
+                const modelMessage = document.createElement("li");
+                modelMessage.classList.add("chat", "incoming");
+                modelMessage.innerHTML = `<img src="img/ConexNurse/logo_nurse.png" alt="Logo"><p>${text}</p>`;
+                chatbox.appendChild(modelMessage);
+                chatbox.scrollTop = chatbox.scrollHeight;
+            } catch (error) {
+                console.error("Error durante el chat AI:", error);
+            }
+
+            document.getElementById("userInput").value = "";
+        }
+
+        document.getElementById("userInput").addEventListener("keypress", function (event) {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                sendMessage();
+            }
+        });
+
+        document.getElementById("emergencyButton").addEventListener("click", sendEmergencyNotification);
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyC4uH1rxmJZyvDn-e8xnLyZ3KFOGgjSPPQ",
+            authDomain: "conexnurse.firebaseapp.com",
+            projectId: "conexnurse",
+            storageBucket: "conexnurse.appspot.com",
+            messagingSenderId: "168276042658",
+            appId: "1:168276042658:web:99c2d9e5d2934aba8348fb",
+            measurementId: "G-FNBJTTY1MD"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+
+        async function checkAndLoadChat() {
+            const db = firebase.firestore();
+            const now = new Date();
+            const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+            try {
+                const querySnapshot = await db.collection('chats')
+                    .where('cliente.id', '==', clientId)
+                    .where('estado', '==', 'activo')
+                    .orderBy('timestamp', 'desc')
+                    .limit(1)
+                    .get();
+
+                if (!querySnapshot.empty) {
+                    const chatDoc = querySnapshot.docs[0];
+                    const chatData = chatDoc.data();
+
+                    if (chatData.timestamp.toDate() > twentyFourHoursAgo) {
+                        selectedChatId = chatDoc.id;
+                        alert("Chat restablecido.");
+                        loadMessages(selectedChatId);
+                    } else {
+                        await db.collection('chats').doc(chatDoc.id).update({ estado: 'inactivo' });
+                        createNewChat();
+                    }
+                } else {
+                    createNewChat();
+                }
+            } catch (error) {
+                console.error("Error al verificar y cargar el chat:", error);
+            }
+        }
+
+        async function sendEmergencyNotification() {
+            try {
+                const response = await fetch('https://3j2mtbwx80.execute-api.us-east-2.amazonaws.com/dev/emergency', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: 'Se ha presionado el botón de emergencia.'
+                    })
+                });
+
+                const responseData = await response.json();
+                console.log('Respuesta de Lambda:', responseData);
+                window.location.href = "chat-doctor.html";
+                alert("Se ha enviado una notificación de emergencia al doctor.");
+            } catch (error) {
+                console.error("Error enviando notificación de emergencia:", error);
+                alert("Error enviando notificación de emergencia.");
+            }
+        }
+
+        async function createNewChat() {
+            const db = firebase.firestore();
+            const newChat = {
+                doctor: { id: doctorId, nombre: doctorName },
+                cliente: { id: clientId, consulta: clientConsulta },
+                messages: [],
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                estado: 'activo'
+            };
+
+            try {
+                const docRef = await db.collection('chats').add(newChat);
+                selectedChatId = docRef.id;
+                sendInitialMessage();
+                loadMessages(selectedChatId);
+            } catch (error) {
+                console.error("Error al crear un nuevo chat:", error);
+            }
+        }
+
+        function sendInitialMessage() {
+            const initialMessage = {
+                sender: doctorId,
+                senderName: doctorName,
+                text: 'Hola',
+                timestamp: firebase.firestore.Timestamp.now()
+            };
+
+            db.collection('chats').doc(selectedChatId).update({
+                messages: firebase.firestore.FieldValue.arrayUnion(initialMessage)
+            });
+        }
+
+        function loadMessages(chatId) {
+            const db = firebase.firestore();
+            chatMessagesElement.innerHTML = '';
+            db.collection('chats').doc(chatId).onSnapshot((doc) => {
+                chatMessagesElement.innerHTML = '';
+                const chatData = doc.data();
+                if (chatData && chatData.messages) {
+                    chatData.messages.forEach(message => {
+                        displayMessage(message);
+                    });
+                }
+            });
+        }
+
+        function displayMessage(message) {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('message', message.sender === clientId ? 'right' : 'left');
+            messageElement.innerHTML = `<div class="sender">${message.senderName}</div>
+                                        <div class="text">${message.text}</div>
+                                        <div class="time">${new Date(message.timestamp.toDate()).toLocaleString()}</div>`;
+            chatMessagesElement.appendChild(messageElement);
+        }
+
+        document.addEventListener("DOMContentLoaded", function() {
+            checkAndLoadChat();
+        });
+
+        initializeChat();
+    </script>
+</body>
+</html>
